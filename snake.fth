@@ -4,8 +4,15 @@
 \ Modified by: Richard James Howe / howe.r.j.89@gmail.com
 \ Repo: https://github.com/howerj/snake
 \
-\ TODO: Speed up/down controls, Blue walls, Rename variables, hash system
-\ state to reseed PRNG, rating code name (SOLID SNEK)
+\ NOTES:
+\
+\ It would be possible to save the game using the FORTH BLOCK word-set if
+\ we did some bit-shifting. This could be saved along with high-scores upon
+\ quitting, so it could be resumed on entering the game again.
+\
+\ Redoing the loops either using FOR...NEXT loops, or using 
+\ BEGIN...WHILE...REPEAT would allow porting to eForth systems.
+\
 
 only forth also definitions decimal
 
@@ -40,25 +47,30 @@ cell 8 = [if] 12 constant a 25 constant b 27 constant c [then]
 : reset escape ." [2J" escape ." [2;1H" ;
 : uncolor escape ." [0m" ;
 : green escape ." [1;32m" ;
+: blue escape ." [1;44m" ;
 : red escape ." [1;31m" ;
 : yellow escape ." [1;33m" ;
 : blink escape ." [5m" ;
-: snek yellow ." oo" uncolor ;
-: apple green ." @@" uncolor ;
-: background ." .." ;
-: pixel 
+: snek yellow ."  o" uncolor ;
+: apple green ."  @" uncolor ;
+: background ."   " ;
+: wall blue ."   " uncolor ;
+: pixel
+   -1 over = if snek then
     2 over = if background then 
     1 over = if apple then 
-    0 over = if snek then drop ;
+    0 over = if wall then drop ;
+: banner ." SNAKE KEYS: WASD = MOVEMENT, PAUSE = P, Q = QUIT" cr ;
 : display
-  reset 
-  ." Snek Keys: WASD = Movement, Pause = P, Q = Quit" cr
+  reset
+  banner
   width 0 do 
     height 0 do
       i j convert-x-y graphics + @ pixel
     loop cr
   loop cr 1 frame +! ;
 : draw convert-x-y graphics + ! ; ( color x y -- )
+: draw-ultra -1 rot rot draw ; ( x y -- )
 : draw-white 2 rot rot draw ; ( x y -- )
 : draw-gray  1 rot rot draw ; ( x y -- )
 : draw-black 0 rot rot draw ; ( x y -- )
@@ -92,8 +104,10 @@ cell 8 = [if] 12 constant a 25 constant b 27 constant c [then]
 : turn-up    is-horizontal if up direction    ! then ;  
 : turn-left  is-vertical   if left direction  ! then ;  
 : turn-down  is-horizontal if down direction  ! then ;  
-: turn-right is-vertical   if right direction ! then ;  
-: change-direction ( key -- ) 
+: turn-right is-vertical   if right direction ! then ;
+: >lower dup [char] A [char] Z 1+ within if $20 xor then ;
+: change-direction ( key -- )
+  >lower
   [char] a over = if turn-left  then 
   [char] w over = if turn-up    then 
   [char] d over = if turn-right then 
@@ -114,17 +128,28 @@ cell 8 = [if] 12 constant a 25 constant b 27 constant c [then]
   snake-x-head @ apple-x @ = 
   snake-y-head @ apple-y @ = 
   and if move-apple grow-snake then ;  
-: check-collision snake-x-head @ snake-y-head @ convert-x-y graphics + @ 0= ;
+: check-collision snake-x-head @ snake-y-head @ convert-x-y graphics + @ 0<= ;
 : draw-snake 
   length @ 0 do 
-    i snake-x @ i snake-y @ draw-black 
+    i snake-x @ i snake-y @ draw-ultra
   loop 
   length @ snake-x @ 
   length @ snake-y @ 
   draw-white ;  
 : draw-apple apple-x @ apple-y @ draw-gray ;  
 : score frame @ length @ 10 * + ;
-: display-score ." Score: " blink score u. uncolor cr ;
+: display-score ." SCORE:     " blink score u. uncolor ;
+: code-name
+  dup 10000 >= if drop ." BIG BOSS"   exit then
+  dup 5000  >= if drop ." SOLID SNAKE"  exit then
+  dup 1000  >= if drop ." LIQUID SNAKE" exit then
+  dup 700   >= if drop ." TROGDOR" exit then
+  dup 500   >= if drop ." BLACK ADDER" exit then
+  dup 200   >= if drop ." SNAKE" exit then
+  drop ." SNEK" ;
+: display-code ." CODE NAME: " blink score code-name uncolor ;
+: fake-code ." CODE NAME: " blink ." QUITTER McQUITTERSON" uncolor ;
+: au-revoir ." QUITTER!" cr display-score cr fake-code cr ;
 : game-loop ( -- ) 
   begin 
     draw-snake 
@@ -135,10 +160,10 @@ cell 8 = [if] 12 constant a 25 constant b 27 constant c [then]
     move-snake-tail 
     move-snake-head 
     check-apple 
-    auf-wiedersehen @ if ." Quitter!" cr display-score exit then
+    auf-wiedersehen @ if au-revoir cr exit then
     check-collision
   until 
-  ." No step on Snek >:C" cr display-score cr ;  
+  ." NO STEP ON SNEK >:C" cr display-score cr display-code cr cr ;  
 : start  initialize game-loop ;  
 start
 bye
