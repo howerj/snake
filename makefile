@@ -7,4 +7,4 @@ run:
 test:
 
 clean:
-
+	rm -f *.fb
